@@ -30,7 +30,7 @@ impl ZellijPlugin for State {
     }
 
     fn update(&mut self, event: Event) -> bool {
-        let mut should_render = true;
+        let mut should_render = false;
         match event {
             Event::RunCommandResult(exit_code, stdout, stderr, context) => {
                 self.error_message = Some(
@@ -48,6 +48,8 @@ impl ZellijPlugin for State {
                         ColType::Resource => ColType::ResourceType,
                         ColType::ResourceDetails => ColType::Resource,
                     };
+
+                    should_render = true;
                 }
                 Key::Right => {
                     self.selected_col = match self.selected_col {
@@ -56,14 +58,20 @@ impl ZellijPlugin for State {
                         ColType::Resource => ColType::ResourceDetails,
                         ColType::ResourceDetails => ColType::ResourceDetails,
                     };
+
+                    should_render = true;
                 }
                 Key::Up => {
                     self.cluster_state
                         .select_item(ListDir::Up, &self.selected_col);
+
+                    should_render = true;
                 }
                 Key::Down => {
                     self.cluster_state
                         .select_item(ListDir::Down, &self.selected_col);
+
+                    should_render = true;
                 }
                 _ => (),
             },
