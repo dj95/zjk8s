@@ -22,7 +22,7 @@ zjk8s must either be downloaded to the file system or configured with a remote U
 
 ```javascript
 pane {
-    plugin location="file:target/wasm32-wasi/debug/zjk8s.wasm" {
+    plugin location="https://github.com/dj95/zjk8s/releases/latest/download/zjk8s.wasm" {
         kubernetes_context "k8s"
 
         selected_item_bg               "#737592"
