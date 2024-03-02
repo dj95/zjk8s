@@ -14,6 +14,8 @@
   The goal of this plugin is to provide an easy way to explore resources in a kubernetes cluster and retrieve its details.
 </p>
 
+<img src="./assets/demo.gif" alt="Demo GIF of zellij with zjk8s" />
+
 ## 🚀 Installation
 
 *TBW*
