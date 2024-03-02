@@ -1,8 +1,32 @@
+use miette::{Diagnostic, NamedSource, Report, Result, SourceSpan};
 use std::cmp;
+use thiserror::Error;
 
-use anstyle::{Ansi256Color, Style};
+use anstyle::{Ansi256Color, AnsiColor, Color, RgbColor, Style};
 
 use super::kubernetes::State;
+
+#[derive(Error, Debug, Diagnostic)]
+#[error("Invalid Color")]
+#[diagnostic(help("Color cannot be coverted from hex"))]
+struct InvalidColor {
+    #[source_code]
+    src: NamedSource<String>,
+
+    #[label("This error occured")]
+    bad_bit: SourceSpan,
+}
+
+#[derive(Error, Debug, Diagnostic)]
+#[error("Missing configuration")]
+#[diagnostic(help("Configuration value is missing"))]
+struct MissingConfigValue {
+    #[source_code]
+    src: NamedSource<String>,
+
+    #[label("This error occured")]
+    bad_bit: SourceSpan,
+}
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Debug, Copy, Clone)]
 pub enum ColType {
@@ -40,29 +64,74 @@ pub struct Render {
 }
 
 impl Render {
-    pub fn new() -> Self {
+    pub fn new(
+        selected_bg: Option<&str>,
+        selected_col_bg: Option<&str>,
+        selected_col_selected_bg: Option<&str>,
+    ) -> Result<Self> {
         let normal_style = Style::new();
 
+        let selected_bg = match selected_bg {
+            Some(s) => parse_color(s)?,
+            None => {
+                return Err(MissingConfigValue {
+                    src: NamedSource::new(
+                        "layout.kdl",
+                        "\"selected_item_bg\" is missing".to_string(),
+                    ),
+                    bad_bit: (0, 0).into(),
+                }
+                .into());
+            }
+        };
+
+        let selected_col_bg = match selected_col_bg {
+            Some(s) => parse_color(s)?,
+            None => {
+                return Err(MissingConfigValue {
+                    src: NamedSource::new(
+                        "layout.kdl",
+                        "\"selected_col_item_bg\" is missing".to_string(),
+                    ),
+                    bad_bit: (0, 0).into(),
+                }
+                .into());
+            }
+        };
+
+        let selected_col_selected_bg = match selected_col_selected_bg {
+            Some(s) => parse_color(s)?,
+            None => {
+                return Err(MissingConfigValue {
+                    src: NamedSource::new(
+                        "layout.kdl",
+                        "\"selected_col_selected_item_bg\" is missing".to_string(),
+                    ),
+                    bad_bit: (0, 0).into(),
+                }
+                .into());
+            }
+        };
+
         let mut selected_style = Style::new();
-        selected_style = selected_style.bg_color(Some(anstyle::Color::Ansi256(Ansi256Color(243))));
+        selected_style = selected_style.bg_color(Some(selected_bg));
         selected_style = selected_style.bold();
 
         let mut selected_col_style = Style::new();
-        selected_col_style =
-            selected_col_style.bg_color(Some(anstyle::Color::Ansi256(Ansi256Color(233))));
+        selected_col_style = selected_col_style.bg_color(Some(selected_col_bg));
         selected_col_style = selected_col_style.bold();
 
         let mut selected_col_selected_style = Style::new();
         selected_col_selected_style =
-            selected_col_selected_style.bg_color(Some(anstyle::Color::Ansi256(Ansi256Color(243))));
+            selected_col_selected_style.bg_color(Some(selected_col_selected_bg));
         selected_col_selected_style = selected_col_selected_style.bold();
 
-        Self {
+        Ok(Self {
             normal_style,
             selected_style,
             selected_col_style,
             selected_col_selected_style,
-        }
+        })
     }
 
     pub fn render_cluster_state(
@@ -235,5 +304,83 @@ impl Render {
 
             println!("{}{}", print_text, self.selected_col_style.render_reset());
         }
+    }
+}
+
+fn hex_to_rgb(s: &str) -> Result<Vec<u8>> {
+    if s.len() != 6 {
+        return Err(InvalidColor {
+            src: NamedSource::new(
+                "render.rs",
+                format!("hex string \"{}\" does not contain 6 characters", s),
+            ),
+            bad_bit: (0, s.len()).into(),
+        }
+        .into());
+    }
+
+    (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(Report::msg))
+        .collect()
+}
+
+fn parse_color(color: &str) -> Result<Color> {
+    if color.starts_with('#') {
+        let rgb = match hex_to_rgb(color.strip_prefix('#').unwrap()) {
+            Ok(rgb) => rgb,
+            Err(e) => {
+                return Err(e);
+            }
+        };
+
+        if rgb.len() != 3 {
+            return Err(InvalidColor {
+                src: NamedSource::new(
+                    "render.rs",
+                    format!("rgb does not contain 3 values for input \"{}\"", color),
+                ),
+                bad_bit: (0, color.len()).into(),
+            }
+            .into());
+        }
+
+        return Ok(RgbColor(
+            *rgb.first().unwrap(),
+            *rgb.get(1).unwrap(),
+            *rgb.get(2).unwrap(),
+        )
+        .into());
+    }
+
+    if let Some(color) = color_by_name(color) {
+        return Ok(color.into());
+    }
+
+    if let Ok(result) = color.parse::<u8>() {
+        return Ok(Ansi256Color(result).into());
+    }
+
+    Err(InvalidColor {
+        src: NamedSource::new(
+            "render.rs",
+            format!("color \"{}\" cannot be converted or found", color),
+        ),
+        bad_bit: (0, color.len()).into(),
+    }
+    .into())
+}
+
+fn color_by_name(color: &str) -> Option<AnsiColor> {
+    match color {
+        "black" => Some(AnsiColor::Black),
+        "red" => Some(AnsiColor::Red),
+        "green" => Some(AnsiColor::Green),
+        "yellow" => Some(AnsiColor::Yellow),
+        "blue" => Some(AnsiColor::Blue),
+        "magenta" => Some(AnsiColor::Magenta),
+        "cyan" => Some(AnsiColor::Cyan),
+        "white" => Some(AnsiColor::White),
+        _ => None,
     }
 }

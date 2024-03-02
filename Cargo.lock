@@ -3955,6 +3955,7 @@ version = "0.1.0"
 dependencies = [
  "ansi_term",
  "anstyle",
+ "anyhow",
  "chrono",
  "console",
  "itertools 0.12.1",

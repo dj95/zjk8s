@@ -1,6 +1,5 @@
 use itertools::Itertools;
-use miette::{Diagnostic, SourceSpan};
-use miette::{NamedSource, Result};
+use miette::{Diagnostic, NamedSource, Result, SourceSpan};
 use std::{collections::BTreeMap, u8};
 use thiserror::Error;
 

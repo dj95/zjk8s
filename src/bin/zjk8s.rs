@@ -2,7 +2,7 @@ use miette::Result;
 use zellij_tile::prelude::*;
 use zjk8s::{
     kubernetes::{self, ListDir},
-    render::{self, ColType},
+    render::{ColType, Render},
 };
 
 use std::collections::BTreeMap;
@@ -13,7 +13,7 @@ struct State {
     cluster_state: kubernetes::State,
     selected_col: ColType,
     error_message: Option<Result<()>>,
-    renderer: render::Render,
+    renderer: Render,
 }
 
 register_plugin!(State);
@@ -29,7 +29,23 @@ impl ZellijPlugin for State {
 
         subscribe(&[EventType::Key, EventType::RunCommandResult]);
 
-        self.renderer = render::Render::new();
+        self.renderer = match Render::new(
+            self.userspace_configuration
+                .get("selected_item_bg")
+                .map(|s| s.as_str()),
+            self.userspace_configuration
+                .get("selected_col_bg")
+                .map(|s| s.as_str()),
+            self.userspace_configuration
+                .get("selected_col_selected_item_bg")
+                .map(|s| s.as_str()),
+        ) {
+            Ok(r) => r,
+            Err(e) => {
+                self.error_message = Some(Err(e));
+                Render::default()
+            }
+        };
     }
 
     fn update(&mut self, event: Event) -> bool {
@@ -108,6 +124,12 @@ impl ZellijPlugin for State {
     }
 
     fn render(&mut self, rows: usize, cols: usize) {
+        if let Some(Err(e)) = &self.error_message {
+            println!("Error: {:?}", e);
+
+            return;
+        }
+
         let k8s_context = self
             .userspace_configuration
             .get("context")
@@ -128,12 +150,6 @@ impl ZellijPlugin for State {
             eprintln!("Querying resources...");
 
             self.refresh_resources(&k8s_context);
-        }
-
-        if let Some(Err(e)) = &self.error_message {
-            println!("Error: {:?}", e);
-
-            return;
         }
 
         self.renderer
