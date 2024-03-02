@@ -2,8 +2,7 @@ layout {
     tab {
         pane {
             plugin location="file:target/wasm32-wasi/debug/zjk8s.wasm" {
-                config_key "config_value"
-                print_config true
+                context "k8s"
             }
         }
     }

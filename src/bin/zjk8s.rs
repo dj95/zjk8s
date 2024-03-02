@@ -73,15 +73,20 @@ impl ZellijPlugin for State {
     }
 
     fn render(&mut self, _rows: usize, _cols: usize) {
+        let k8s_context = self
+            .userspace_configuration
+            .get("context")
+            .map(|s| s.as_str());
+
         if self.cluster_state.namespaces.is_none() {
             eprintln!("Querying namespaces...");
-            kubernetes::query_namespaces(None);
+            kubernetes::query_namespaces(k8s_context);
         }
 
         if self.cluster_state.refresh_resource_types {
             eprintln!("Querying resource types...");
             kubernetes::query_resource_types(
-                None,
+                k8s_context,
                 self.cluster_state.selected_namespace.as_ref().unwrap(),
             );
         }
@@ -89,7 +94,7 @@ impl ZellijPlugin for State {
         if self.cluster_state.refresh_resources {
             eprintln!("Querying resources...");
             kubernetes::query_resources(
-                None,
+                k8s_context,
                 self.cluster_state.selected_namespace.as_ref().unwrap(),
                 self.cluster_state.selected_resource_type.as_ref().unwrap(),
             );
