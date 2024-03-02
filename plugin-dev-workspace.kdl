@@ -2,7 +2,7 @@ layout {
     tab {
         pane {
             plugin location="file:target/wasm32-wasi/debug/zjk8s.wasm" {
-                context "k8s"
+                kubernetes_context "k8s"
 
                 selected_item_bg               "#737592"
                 selected_col_bg                "#2a2b3e"

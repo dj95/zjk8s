@@ -16,12 +16,26 @@
 
 <img src="./assets/demo.gif" alt="Demo GIF of zellij with zjk8s" />
 
-## 🚀 Installation
+## 🚀 Usage
 
-*TBW*
+zjk8s must either be downloaded to the file system or configured with a remote URL within a zellij layout, such that zellij is able to download the plugin. The following configuration must be added to the layout, in which you'd like to use zjk8s.
+
+```javascript
+pane {
+    plugin location="file:target/wasm32-wasi/debug/zjk8s.wasm" {
+        kubernetes_context "k8s"
+
+        selected_item_bg               "#737592"
+        selected_col_bg                "#2a2b3e"
+        selected_col_selected_item_bg  "#737592"
+    }
+}
+```
 
 > [!IMPORTANT]
 > In case you experience any crashes or issues, please in the first step try to clear the cache! (`$HOME/.cache/zellij/` for Linux, `$HOME/Library/Caches/org.Zellij-Contributors.Zellij/` on macOS)
+
+When the layout and the plugin is started, it should display the namespaces, all resource types in the first namespace and all resources of the first resource type. For larger clusters, it might take a few seconds to load all resources. When everything is loaded, navigate with the arrow keys through the lists and columns. If you press `Enter` on a resource, it will display the details of the resource on the right.
 
 ## ❄️ Installation with nix flake
 
@@ -51,10 +65,6 @@ config file, you can use `${pkgs.zjk8s}/bin/zjk8s.wasm` as the path.
       })
     ];
 ```
-
-## ⚙️ Configuration
-
-*TBW*
 
 ## 🚧 Development
 

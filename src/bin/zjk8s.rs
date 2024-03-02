@@ -105,7 +105,7 @@ impl ZellijPlugin for State {
 
                             kubernetes::query_resource_details(
                                 self.userspace_configuration
-                                    .get("context")
+                                    .get("kubernetes_context")
                                     .map(|s| s.as_str()),
                                 &namespace.unwrap(),
                                 &resource_type.unwrap(),
@@ -132,7 +132,7 @@ impl ZellijPlugin for State {
 
         let k8s_context = self
             .userspace_configuration
-            .get("context")
+            .get("kubernetes_context")
             .map(|s| s.as_str());
 
         if self.cluster_state.namespaces.is_none() {
