@@ -18,7 +18,7 @@
 
 *TBW*
 
-> ![!IMPORTANT]
+> [!IMPORTANT]
 > In case you experience any crashes or issues, please in the first step try to clear the cache! (`$HOME/.cache/zellij/` for Linux, `$HOME/Library/Caches/org.Zellij-Contributors.Zellij/` on macOS)
 
 ## ❄️ Installation with nix flake
