@@ -13,6 +13,7 @@ struct State {
     cluster_state: kubernetes::State,
     selected_col: ColType,
     error_message: Option<Result<()>>,
+    renderer: render::Render,
 }
 
 register_plugin!(State);
@@ -27,6 +28,8 @@ impl ZellijPlugin for State {
         ]);
 
         subscribe(&[EventType::Key, EventType::RunCommandResult]);
+
+        self.renderer = render::Render::new();
     }
 
     fn update(&mut self, event: Event) -> bool {
@@ -80,7 +83,7 @@ impl ZellijPlugin for State {
         should_render
     }
 
-    fn render(&mut self, _rows: usize, _cols: usize) {
+    fn render(&mut self, rows: usize, _cols: usize) {
         let k8s_context = self
             .userspace_configuration
             .get("context")
@@ -114,6 +117,7 @@ impl ZellijPlugin for State {
             return;
         }
 
-        render::render_cluster_state(&self.cluster_state, &self.selected_col)
+        self.renderer
+            .render_cluster_state(&self.cluster_state, &self.selected_col, rows)
     }
 }
