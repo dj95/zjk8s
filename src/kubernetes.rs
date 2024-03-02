@@ -17,21 +17,22 @@ pub enum ListDir {
 pub struct State {
     // kubectl get namespace
     pub namespaces: Option<Vec<String>>,
-    pub selected_namespace: Option<String>,
+    pub selected_namespace: Option<usize>,
     pub refresh_namespaces: bool,
 
     // kubectl get api-resources correlated with kubectl get
     pub resource_types: Option<Vec<String>>,
-    pub selected_resource_type: Option<String>,
+    pub selected_resource_type: Option<usize>,
     pub refresh_resource_types: bool,
 
     // kubectl get <resource_type>
     pub resources: Option<Vec<String>>,
-    pub selected_resource: Option<String>,
+    pub selected_resource: Option<usize>,
     pub refresh_resources: bool,
 
     // kubectl get <resource_type>/<resource>
-    pub resource_details: Option<String>,
+    pub resource_details: Option<Vec<String>>,
+    pub selected_resource_details_line: Option<usize>,
     pub refresh_resource_details: bool,
 }
 
@@ -88,7 +89,7 @@ pub fn query_namespaces(kube_context: Option<&str>) {
     }
 }
 
-pub fn query_resource_types(kube_context: Option<&str>, namespace: &str) {
+pub fn query_resource_types(kube_context: &Option<&str>, namespace: &str) {
     let command_ctx: BTreeMap<String, String> =
         BTreeMap::from([("command".to_owned(), "query_resource_types".to_owned())]);
 
@@ -123,7 +124,7 @@ pub fn query_resource_types(kube_context: Option<&str>, namespace: &str) {
     }
 }
 
-pub fn query_resources(kube_context: Option<&str>, namespace: &str, resource_type: &str) {
+pub fn query_resources(kube_context: &Option<&str>, namespace: &str, resource_type: &str) {
     let command_ctx: BTreeMap<String, String> =
         BTreeMap::from([("command".to_owned(), "query_resources".to_owned())]);
 
@@ -158,7 +159,76 @@ pub fn query_resources(kube_context: Option<&str>, namespace: &str, resource_typ
     }
 }
 
+pub fn query_resource_details(
+    kube_context: Option<&str>,
+    namespace: &str,
+    resource_type: &str,
+    resource: &str,
+) {
+    let command_ctx: BTreeMap<String, String> =
+        BTreeMap::from([("command".to_owned(), "query_resource_details".to_owned())]);
+
+    if let Some(context) = kube_context {
+        run_command(
+            &[
+                "kubectl",
+                "get",
+                resource_type,
+                resource,
+                "--context",
+                context,
+                "--namespace",
+                namespace,
+                "--output",
+                "yaml",
+            ],
+            command_ctx,
+        );
+    } else {
+        run_command(
+            &[
+                "kubectl",
+                "get",
+                resource_type,
+                resource,
+                "--namespace",
+                namespace,
+                "--output",
+                "yaml",
+            ],
+            command_ctx,
+        );
+    }
+}
+
 impl State {
+    pub fn get_selected_item(&self, col_type: &ColType) -> Option<String> {
+        match col_type {
+            ColType::Namespace => {
+                if let Some(namespaces) = &self.namespaces {
+                    Some(namespaces[self.selected_namespace?].clone())
+                } else {
+                    None
+                }
+            }
+            ColType::ResourceType => {
+                if let Some(resource_types) = &self.resource_types {
+                    Some(resource_types[self.selected_resource_type?].clone())
+                } else {
+                    None
+                }
+            }
+            ColType::Resource => {
+                if let Some(resources) = &self.resources {
+                    Some(resources[self.selected_resource?].clone())
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
     pub fn select_item(&mut self, direction: ListDir, col_type: &ColType) {
         match col_type {
             ColType::Namespace => {
@@ -190,7 +260,11 @@ impl State {
             }
             ColType::ResourceDetails => {
                 if let Some(resource_details) = &self.resource_details {
-                    self.resource_details = Some(resource_details.to_string());
+                    self.selected_resource_details_line = Some(get_next_item(
+                        resource_details,
+                        &self.selected_resource_details_line,
+                        direction,
+                    ));
                 }
             }
         }
@@ -206,10 +280,10 @@ impl State {
         match context.get("command") {
             Some(command) => match command.as_str() {
                 "query_namespaces" => {
-                    let result = self.result(exit_code, stdout, stderr, context)?;
+                    let result = self.result(exit_code, stdout, stderr, context, ' ')?;
 
-                    self.namespaces = Some(result.0);
-                    self.selected_namespace = Some(result.1);
+                    self.namespaces = Some(result);
+                    self.selected_namespace = Some(0);
 
                     self.refresh_namespaces = false;
                     self.refresh_resource_types = true;
@@ -217,10 +291,10 @@ impl State {
                     Ok(())
                 }
                 "query_resource_types" => {
-                    let result = self.result(exit_code, stdout, stderr, context)?;
+                    let result = self.result(exit_code, stdout, stderr, context, ' ')?;
 
-                    self.resource_types = Some(result.0);
-                    self.selected_resource_type = Some(result.1);
+                    self.resource_types = Some(result);
+                    self.selected_resource_type = Some(0);
 
                     self.refresh_resource_types = false;
                     self.refresh_resources = true;
@@ -228,13 +302,23 @@ impl State {
                     Ok(())
                 }
                 "query_resources" => {
-                    let result = self.result(exit_code, stdout, stderr, context)?;
+                    let result = self.result(exit_code, stdout, stderr, context, ' ')?;
 
-                    self.resources = Some(result.0);
-                    self.selected_resource = Some(result.1);
+                    self.resources = Some(result);
+                    self.selected_resource = Some(0);
 
                     self.refresh_resources = false;
                     self.refresh_resource_details = true;
+
+                    Ok(())
+                }
+                "query_resource_details" => {
+                    let result = self.result(exit_code, stdout, stderr, context, '\n')?;
+
+                    self.resource_details = Some(result);
+                    self.selected_resource_details_line = Some(0);
+
+                    self.refresh_resource_details = false;
 
                     Ok(())
                 }
@@ -250,20 +334,19 @@ impl State {
         stdout: Vec<u8>,
         stderr: Vec<u8>,
         _context: BTreeMap<String, String>,
-    ) -> Result<(Vec<String>, String)> {
+        split_char: char,
+    ) -> Result<Vec<String>> {
         guard_exit_code(exit_code, stderr)?;
 
         match String::from_utf8(stdout) {
             Ok(resource) => {
                 let resources = resource
-                    .split_whitespace()
+                    .split(split_char)
                     .map(|s| s.to_string())
                     .unique()
                     .collect();
 
-                let selected_resource =
-                    resource.split_whitespace().collect::<Vec<&str>>()[0].to_owned();
-                Ok((resources, selected_resource))
+                Ok(resources)
             }
             Err(e) => Err(WrongExitCode {
                 src: NamedSource::new("kubernetes.rs", format!("Error parsing stdout: {}", e)),
@@ -274,27 +357,25 @@ impl State {
     }
 }
 
-fn get_next_item(items: &[String], selected_item: &Option<String>, direction: ListDir) -> String {
+fn get_next_item(items: &[String], selected_item: &Option<usize>, direction: ListDir) -> usize {
     let selected_item = match selected_item {
-        Some(rt) => rt,
-        None => &items[0],
+        Some(rt) => *rt,
+        None => 0,
     };
-
-    let index = items.iter().position(|r| r == selected_item).unwrap();
 
     match direction {
         ListDir::Up => {
-            if index == 0 {
-                items[items.len() - 1].to_string()
+            if selected_item == 0 {
+                items.len().saturating_sub(1)
             } else {
-                items[index - 1].to_string()
+                selected_item.saturating_sub(1)
             }
         }
         ListDir::Down => {
-            if index == items.len() - 1 {
-                items[0].to_string()
+            if selected_item == items.len() - 1 {
+                0
             } else {
-                items[index + 1].to_string()
+                selected_item + 1
             }
         }
     }

@@ -76,6 +76,30 @@ impl ZellijPlugin for State {
 
                     should_render = true;
                 }
+                Key::Char('\n') => {
+                    if self.selected_col == ColType::Resource {
+                        let namespace = self.cluster_state.get_selected_item(&ColType::Namespace);
+                        let resource_type =
+                            self.cluster_state.get_selected_item(&ColType::ResourceType);
+                        let resource = self.cluster_state.get_selected_item(&ColType::Resource);
+
+                        if namespace.is_some() && resource_type.is_some() && resource.is_some() {
+                            self.cluster_state.refresh_resource_details = true;
+                            should_render = true;
+
+                            kubernetes::query_resource_details(
+                                self.userspace_configuration
+                                    .get("context")
+                                    .map(|s| s.as_str()),
+                                &namespace.unwrap(),
+                                &resource_type.unwrap(),
+                                &resource.unwrap(),
+                            );
+
+                            self.selected_col = ColType::ResourceDetails;
+                        }
+                    }
+                }
                 _ => (),
             },
             _ => (),
@@ -83,7 +107,7 @@ impl ZellijPlugin for State {
         should_render
     }
 
-    fn render(&mut self, rows: usize, _cols: usize) {
+    fn render(&mut self, rows: usize, cols: usize) {
         let k8s_context = self
             .userspace_configuration
             .get("context")
@@ -96,19 +120,14 @@ impl ZellijPlugin for State {
 
         if self.cluster_state.refresh_resource_types {
             eprintln!("Querying resource types...");
-            kubernetes::query_resource_types(
-                k8s_context,
-                self.cluster_state.selected_namespace.as_ref().unwrap(),
-            );
+
+            self.refresh_resource_types(&k8s_context);
         }
 
         if self.cluster_state.refresh_resources {
             eprintln!("Querying resources...");
-            kubernetes::query_resources(
-                k8s_context,
-                self.cluster_state.selected_namespace.as_ref().unwrap(),
-                self.cluster_state.selected_resource_type.as_ref().unwrap(),
-            );
+
+            self.refresh_resources(&k8s_context);
         }
 
         if let Some(Err(e)) = &self.error_message {
@@ -118,6 +137,31 @@ impl ZellijPlugin for State {
         }
 
         self.renderer
-            .render_cluster_state(&self.cluster_state, &self.selected_col, rows)
+            .render_cluster_state(&self.cluster_state, &self.selected_col, rows, cols)
+    }
+}
+
+impl State {
+    fn refresh_resource_types(&self, k8s_context: &Option<&str>) {
+        let namespace = match self.cluster_state.get_selected_item(&ColType::Namespace) {
+            Some(namespace) => namespace,
+            None => return,
+        };
+
+        kubernetes::query_resource_types(k8s_context, &namespace);
+    }
+
+    fn refresh_resources(&self, k8s_context: &Option<&str>) {
+        let namespace = match self.cluster_state.get_selected_item(&ColType::Namespace) {
+            Some(namespace) => namespace,
+            None => return,
+        };
+
+        let resource_type = match self.cluster_state.get_selected_item(&ColType::ResourceType) {
+            Some(resource_type) => resource_type,
+            None => return,
+        };
+
+        kubernetes::query_resources(k8s_context, &namespace, &resource_type);
     }
 }

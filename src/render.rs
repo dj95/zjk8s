@@ -65,7 +65,13 @@ impl Render {
         }
     }
 
-    pub fn render_cluster_state(&mut self, state: &State, selected_col: &ColType, rows: usize) {
+    pub fn render_cluster_state(
+        &mut self,
+        state: &State,
+        selected_col: &ColType,
+        rows: usize,
+        cols: usize,
+    ) {
         let mut output: Vec<Col> = vec![];
 
         if let Some(namespaces) = &state.namespaces {
@@ -101,43 +107,51 @@ impl Render {
             ));
         }
 
+        if let Some(resource_details) = &state.resource_details {
+            output.push(self.get_col(
+                resource_details,
+                ColType::ResourceDetails,
+                &state.selected_resource_details_line,
+                selected_col,
+                "Resource Details",
+                rows,
+            ));
+        }
+
         if output.is_empty() {
             return;
         }
 
-        self.render_table(output);
+        self.render_table(output, cols);
     }
 
     fn get_col(
         &mut self,
         data: &[String],
         col_type: ColType,
-        selected_data: &Option<String>,
+        selected_data_index: &Option<usize>,
         selected_col: &ColType,
         header: &str,
         rows: usize,
     ) -> Col {
-        let srt = match selected_data {
+        let srt = match selected_data_index {
             Some(rt) => rt,
-            None => &data[0],
+            None => &0,
         };
 
         let mut items: Vec<Item> = data
             .iter()
             .map(|r| Item {
                 name: r.to_string(),
-                selected: r == srt,
+                selected: false,
             })
             .collect();
 
-        if items.len() > rows {
-            let selected_index = items
-                .iter()
-                .position(|i| i.name == *srt)
-                .unwrap_or_default();
+        items[*srt].selected = true;
 
+        if items.len() > rows {
             let scroll = cmp::min(
-                selected_index.saturating_sub(rows / 2),
+                srt.saturating_sub(rows / 2),
                 items.len().saturating_sub(rows - 2),
             );
 
@@ -163,7 +177,7 @@ impl Render {
         }
     }
 
-    fn render_table(&mut self, table: Vec<Col>) {
+    fn render_table(&mut self, table: Vec<Col>, cols: usize) {
         let mut output_rows: Vec<String> = vec![];
 
         let max_row_count = table.iter().map(|c| c.items.len()).max().unwrap();
@@ -172,14 +186,24 @@ impl Render {
             output_rows.push("".to_owned());
         }
 
-        for row in table {
+        let mut col_counter = 0;
+        for col in &table {
             let mut counter = 0;
+            col_counter += 1;
+            let last_col = col_counter == table.len();
 
-            for item in row.items {
+            for item in &col.items {
                 counter += 1;
-                let space_count = row.max_width - console::measure_text_width(&item.name);
+                let mut space_count = col.max_width - console::measure_text_width(&item.name);
+                if last_col {
+                    space_count = cols.saturating_sub(
+                        console::measure_text_width(&item.name)
+                            + console::measure_text_width(&output_rows[counter - 1])
+                            + 2,
+                    );
+                }
 
-                let selected_style = match (row.selected, item.selected) {
+                let selected_style = match (col.selected, item.selected) {
                     (true, true) => &self.selected_col_selected_style,
                     (true, false) => &self.selected_col_style,
                     (false, true) => &self.selected_style,
@@ -199,12 +223,17 @@ impl Render {
 
             for i in counter + 1..=max_row_count {
                 output_rows[i - 1] =
-                    format!("{} {} ", output_rows[i - 1], " ".repeat(row.max_width));
+                    format!("{} {} ", output_rows[i - 1], " ".repeat(col.max_width));
             }
         }
 
         for output_row in output_rows {
-            println!("{}", output_row);
+            let mut print_text = output_row.clone();
+            if console::measure_text_width(&output_row) > cols {
+                print_text = console::truncate_str(&output_row, cols, "").to_string();
+            }
+
+            println!("{}{}", print_text, self.selected_col_style.render_reset());
         }
     }
 }
