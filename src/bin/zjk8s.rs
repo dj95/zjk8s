@@ -1,10 +1,18 @@
+use miette::Result;
 use zellij_tile::prelude::*;
+use zjk8s::{
+    kubernetes::{self, ListDir},
+    render::{self, ColType},
+};
 
 use std::collections::BTreeMap;
 
 #[derive(Default)]
 struct State {
     userspace_configuration: BTreeMap<String, String>,
+    cluster_state: kubernetes::State,
+    selected_col: ColType,
+    error_message: Option<Result<()>>,
 }
 
 register_plugin!(State);
@@ -24,10 +32,42 @@ impl ZellijPlugin for State {
     fn update(&mut self, event: Event) -> bool {
         let mut should_render = true;
         match event {
-            Event::RunCommandResult(_code, _stdout, _stderr, _ctx) => {
+            Event::RunCommandResult(exit_code, stdout, stderr, context) => {
+                self.error_message = Some(
+                    self.cluster_state
+                        .parse_result(exit_code, stdout, stderr, context),
+                );
+
                 should_render = true;
             }
             Event::Key(key) => {
+                match key {
+                    Key::Left => {
+                        self.selected_col = match self.selected_col {
+                            ColType::Namespace => ColType::Namespace,
+                            ColType::ResourceType => ColType::Namespace,
+                            ColType::Resource => ColType::ResourceType,
+                            ColType::ResourceDetails => ColType::Resource,
+                        };
+                    }
+                    Key::Right => {
+                        self.selected_col = match self.selected_col {
+                            ColType::Namespace => ColType::ResourceType,
+                            ColType::ResourceType => ColType::Resource,
+                            ColType::Resource => ColType::ResourceDetails,
+                            ColType::ResourceDetails => ColType::ResourceDetails,
+                        };
+                    }
+                    Key::Up => {
+                        self.cluster_state
+                            .select_item(ListDir::Up, &self.selected_col);
+                    }
+                    Key::Down => {
+                        self.cluster_state
+                            .select_item(ListDir::Down, &self.selected_col);
+                    }
+                    _ => (),
+                }
                 if let Key::Char('n') = key {
                     open_command_pane_floating(CommandToRun {
                         path: "cargo".into(),
@@ -42,6 +82,34 @@ impl ZellijPlugin for State {
     }
 
     fn render(&mut self, _rows: usize, _cols: usize) {
-        println!("zjk8s");
+        if self.cluster_state.namespaces.is_none() {
+            eprintln!("Querying namespaces...");
+            kubernetes::query_namespaces(None);
+        }
+
+        if self.cluster_state.refresh_resource_types {
+            eprintln!("Querying resource types...");
+            kubernetes::query_resource_types(
+                None,
+                self.cluster_state.selected_namespace.as_ref().unwrap(),
+            );
+        }
+
+        if self.cluster_state.refresh_resources {
+            eprintln!("Querying resource types...");
+            kubernetes::query_resources(
+                None,
+                self.cluster_state.selected_namespace.as_ref().unwrap(),
+                self.cluster_state.selected_resource_type.as_ref().unwrap(),
+            );
+        }
+
+        if let Some(Err(e)) = &self.error_message {
+            println!("Error: {:?}", e);
+
+            return;
+        }
+
+        render::render_cluster_state(&self.cluster_state, &self.selected_col)
     }
 }
