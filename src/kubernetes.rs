@@ -265,25 +265,16 @@ impl State {
                     resource.split_whitespace().collect::<Vec<&str>>()[0].to_owned();
                 Ok((resources, selected_resource))
             }
-            Err(e) => {
-                return Err(WrongExitCode {
-                    src: NamedSource::new(
-                        "kubernetes.rs",
-                        format!("Error parsing stdout: {}", e.to_string()),
-                    ),
-                    bad_bit: (1, 2).into(),
-                }
-                .into());
+            Err(e) => Err(WrongExitCode {
+                src: NamedSource::new("kubernetes.rs", format!("Error parsing stdout: {}", e)),
+                bad_bit: (1, 2).into(),
             }
+            .into()),
         }
     }
 }
 
-fn get_next_item(
-    items: &Vec<String>,
-    selected_item: &Option<String>,
-    direction: ListDir,
-) -> String {
+fn get_next_item(items: &[String], selected_item: &Option<String>, direction: ListDir) -> String {
     let selected_item = match selected_item {
         Some(rt) => rt,
         None => &items[0],

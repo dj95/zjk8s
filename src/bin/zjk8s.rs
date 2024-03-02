@@ -40,42 +40,33 @@ impl ZellijPlugin for State {
 
                 should_render = true;
             }
-            Event::Key(key) => {
-                match key {
-                    Key::Left => {
-                        self.selected_col = match self.selected_col {
-                            ColType::Namespace => ColType::Namespace,
-                            ColType::ResourceType => ColType::Namespace,
-                            ColType::Resource => ColType::ResourceType,
-                            ColType::ResourceDetails => ColType::Resource,
-                        };
-                    }
-                    Key::Right => {
-                        self.selected_col = match self.selected_col {
-                            ColType::Namespace => ColType::ResourceType,
-                            ColType::ResourceType => ColType::Resource,
-                            ColType::Resource => ColType::ResourceDetails,
-                            ColType::ResourceDetails => ColType::ResourceDetails,
-                        };
-                    }
-                    Key::Up => {
-                        self.cluster_state
-                            .select_item(ListDir::Up, &self.selected_col);
-                    }
-                    Key::Down => {
-                        self.cluster_state
-                            .select_item(ListDir::Down, &self.selected_col);
-                    }
-                    _ => (),
+            Event::Key(key) => match key {
+                Key::Left => {
+                    self.selected_col = match self.selected_col {
+                        ColType::Namespace => ColType::Namespace,
+                        ColType::ResourceType => ColType::Namespace,
+                        ColType::Resource => ColType::ResourceType,
+                        ColType::ResourceDetails => ColType::Resource,
+                    };
                 }
-                if let Key::Char('n') = key {
-                    open_command_pane_floating(CommandToRun {
-                        path: "cargo".into(),
-                        args: vec!["test".to_owned()],
-                        cwd: None,
-                    });
+                Key::Right => {
+                    self.selected_col = match self.selected_col {
+                        ColType::Namespace => ColType::ResourceType,
+                        ColType::ResourceType => ColType::Resource,
+                        ColType::Resource => ColType::ResourceDetails,
+                        ColType::ResourceDetails => ColType::ResourceDetails,
+                    };
                 }
-            }
+                Key::Up => {
+                    self.cluster_state
+                        .select_item(ListDir::Up, &self.selected_col);
+                }
+                Key::Down => {
+                    self.cluster_state
+                        .select_item(ListDir::Down, &self.selected_col);
+                }
+                _ => (),
+            },
             _ => (),
         };
         should_render
@@ -96,7 +87,7 @@ impl ZellijPlugin for State {
         }
 
         if self.cluster_state.refresh_resources {
-            eprintln!("Querying resource types...");
+            eprintln!("Querying resources...");
             kubernetes::query_resources(
                 None,
                 self.cluster_state.selected_namespace.as_ref().unwrap(),

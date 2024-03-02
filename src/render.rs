@@ -70,7 +70,7 @@ pub fn render_cluster_state(state: &State, selected_col: &ColType) {
 }
 
 fn get_col(
-    data: &Vec<String>,
+    data: &[String],
     col_type: ColType,
     selected_data: &Option<String>,
     selected_col: &ColType,
@@ -158,13 +158,8 @@ fn render_table(table: Vec<Col>) {
             );
         }
 
-        for _ in counter..max_row_count {
-            counter += 1;
-            output_rows[counter - 1] = format!(
-                "{} {} ",
-                output_rows[counter - 1],
-                " ".repeat(row.max_width)
-            );
+        for i in counter..max_row_count {
+            output_rows[i - 1] = format!("{} {} ", output_rows[i - 1], " ".repeat(row.max_width));
         }
     }
 
