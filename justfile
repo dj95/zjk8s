@@ -9,7 +9,7 @@ build:
   cargo build
 
 run: build
-  zellij -l ./plugin-dev-workspace.kdl -s zjk8s-dev
+  zellij -n ./plugin-dev-workspace.kdl -s zjk8s-dev
 
 test:
   cargo component test -- --nocapture

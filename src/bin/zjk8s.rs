@@ -59,8 +59,8 @@ impl ZellijPlugin for State {
 
                 should_render = true;
             }
-            Event::Key(key) => match key {
-                Key::Left => {
+            Event::Key(key) => match key.bare_key {
+                BareKey::Left => {
                     self.selected_col = match self.selected_col {
                         ColType::Namespace => ColType::Namespace,
                         ColType::ResourceType => ColType::Namespace,
@@ -70,7 +70,7 @@ impl ZellijPlugin for State {
 
                     should_render = true;
                 }
-                Key::Right => {
+                BareKey::Right => {
                     self.selected_col = match self.selected_col {
                         ColType::Namespace => ColType::ResourceType,
                         ColType::ResourceType => ColType::Resource,
@@ -80,19 +80,19 @@ impl ZellijPlugin for State {
 
                     should_render = true;
                 }
-                Key::Up => {
+                BareKey::Up => {
                     self.cluster_state
                         .select_item(ListDir::Up, &self.selected_col);
 
                     should_render = true;
                 }
-                Key::Down => {
+                BareKey::Down => {
                     self.cluster_state
                         .select_item(ListDir::Down, &self.selected_col);
 
                     should_render = true;
                 }
-                Key::Char('\n') => {
+                BareKey::Enter => {
                     if self.selected_col == ColType::Resource {
                         let namespace = self.cluster_state.get_selected_item(&ColType::Namespace);
                         let resource_type =
@@ -115,6 +115,9 @@ impl ZellijPlugin for State {
                             self.selected_col = ColType::ResourceDetails;
                         }
                     }
+                }
+                BareKey::Esc => {
+                    close_self();
                 }
                 _ => (),
             },
