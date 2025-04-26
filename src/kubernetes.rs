@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use miette::{Diagnostic, NamedSource, Result, SourceSpan};
-use std::{collections::BTreeMap, u8};
+use std::collections::BTreeMap;
 use thiserror::Error;
 
 use zellij_tile::prelude::*;
@@ -39,17 +39,6 @@ pub struct State {
 #[error("Wrong Exit Code")]
 #[diagnostic(help("There was en error running the command"))]
 struct WrongExitCode {
-    #[source_code]
-    src: NamedSource<String>,
-
-    #[label("This error occured")]
-    bad_bit: SourceSpan,
-}
-
-#[derive(Error, Debug, Diagnostic)]
-#[error("Wrong Exit Code")]
-#[diagnostic(help("There was en error running the command"))]
-struct WrongFormat {
     #[source_code]
     src: NamedSource<String>,
 
